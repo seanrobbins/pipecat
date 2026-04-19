@@ -70,6 +70,13 @@ class DebugLogObserver(BaseObserver):
                     }
                 ),
             ]
+
+        Log all frames except specific frame types::
+
+            from pipecat.frames.frames import MetricsFrame, DTMFFrame
+            observers=[
+                DebugLogObserver(exclude_frame_types=(MetricsFrame, DTMFFrame)),
+            ]
     """
 
     def __init__(
@@ -78,6 +85,7 @@ class DebugLogObserver(BaseObserver):
         | dict[type[Frame], tuple[type, FrameEndpoint] | None]
         | None = None,
         exclude_fields: set[str] | None = None,
+        exclude_frame_types: tuple[type[Frame], ...] | None = None,
         **kwargs,
     ):
         """Initialize the debug log observer.
@@ -93,6 +101,8 @@ class DebugLogObserver(BaseObserver):
                 of (service_type, endpoint) to filter on specific services.
             exclude_fields: Field names to exclude from logging. Defaults to
                 excluding binary data fields like 'audio', 'image', 'images'.
+            exclude_frame_types: Frame types to exclude from logging. Any frame
+                of these types will not be logged, even if they match frame_types.
             **kwargs: Additional arguments passed to parent class.
         """
         super().__init__(**kwargs)
@@ -117,6 +127,11 @@ class DebugLogObserver(BaseObserver):
                 "image",  # Skip binary image data
                 "images",  # Skip lists of images
             }
+        )
+
+        # Process excluded frame types
+        self.excluded_frame_types = (
+            set(exclude_frame_types) if exclude_frame_types else set()
         )
 
     def _format_value(self, value):
@@ -144,6 +159,10 @@ class DebugLogObserver(BaseObserver):
 
     def _should_log_frame(self, frame, src, dst):
         """Determine if a frame should be logged based on filters."""
+        # Check if this frame type is excluded first
+        if type(frame) in self.excluded_frame_types:
+            return False
+
         # If no filters, log all frames
         if not self.frame_filters:
             return True
